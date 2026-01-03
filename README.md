@@ -31,6 +31,9 @@ PDetective/
 │   ├── training/          # Training scripts
 │   ├── evaluation/        # Evaluation metrics and scripts
 │   └── utils/             # Utility functions
+├── examples/             # Example scripts
+│   ├── train.py          # Training example
+│   └── detect.py         # Inference example
 ├── data/                  # Data directory (not tracked)
 │   ├── raw/              # Raw audio files
 │   ├── processed/        # Preprocessed features
