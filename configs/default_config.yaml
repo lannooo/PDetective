@@ -1,0 +1,98 @@
+# Configuration file for PDetective experiments
+# This is an example configuration - customize as needed
+
+# Model configuration
+model:
+  name: "baseline_model"  # Model architecture name
+  type: "cnn"  # Model type: cnn, rnn, transformer, hybrid
+  
+  # Architecture parameters
+  params:
+    input_dim: 80  # Input feature dimension
+    hidden_dim: 256  # Hidden layer dimension
+    num_layers: 4  # Number of layers
+    dropout: 0.3  # Dropout rate
+    activation: "relu"  # Activation function
+
+# Dataset configuration
+dataset:
+  name: "asvspoof"  # Dataset name
+  path: "data/raw"  # Path to raw data
+  
+  # Preprocessing
+  sample_rate: 16000  # Audio sample rate
+  window_size: 0.025  # Window size in seconds
+  hop_size: 0.010  # Hop size in seconds
+  
+  # Features
+  feature_type: "mfcc"  # Feature type: mfcc, spectrogram, mel_spec
+  n_mfcc: 40  # Number of MFCC coefficients
+  n_fft: 512  # FFT size
+  
+  # Splits
+  train_split: 0.7
+  val_split: 0.15
+  test_split: 0.15
+
+# Training configuration
+training:
+  batch_size: 32
+  num_epochs: 100
+  learning_rate: 0.001
+  optimizer: "adam"  # adam, sgd, adamw
+  
+  # Learning rate scheduling
+  scheduler:
+    type: "cosine"  # cosine, step, exponential
+    warmup_epochs: 5
+    
+  # Early stopping
+  early_stopping:
+    patience: 10
+    metric: "val_loss"
+    mode: "min"
+    
+  # Checkpointing
+  checkpoint:
+    save_freq: 5  # Save every N epochs
+    save_best: true  # Save best model
+    
+# Evaluation configuration
+evaluation:
+  metrics:
+    - "eer"  # Equal Error Rate
+    - "auc"  # Area Under Curve
+    - "accuracy"
+    - "precision"
+    - "recall"
+    - "f1"
+  
+  # Temporal localization evaluation
+  localization:
+    enabled: true
+    threshold: 0.5
+    tolerance: 0.1  # Tolerance in seconds
+
+# Experiment tracking
+experiment:
+  name: "baseline_experiment"
+  tags: ["baseline", "cnn"]
+  notes: "Initial baseline model for partial deepfake detection"
+  
+  # Logging
+  log_dir: "experiments/logs"
+  save_dir: "experiments/results"
+  
+  # Random seed for reproducibility
+  seed: 42
+  
+  # Device configuration
+  device: "cuda"  # cuda, cpu, mps
+  num_workers: 4  # Number of data loading workers
+  
+# Visualization
+visualization:
+  plot_interval: 10  # Plot every N epochs
+  save_plots: true
+  plot_confusion_matrix: true
+  plot_roc_curve: true

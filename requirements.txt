@@ -1,0 +1,44 @@
+# Core dependencies for PDetective
+# Note: Specific versions will be added as the code is developed
+
+# Deep Learning
+torch>=1.10.0
+torchaudio>=0.10.0
+torchvision>=0.11.0
+
+# Audio Processing
+librosa>=0.9.0
+soundfile>=0.11.0
+scipy>=1.7.0
+resampy>=0.3.0
+
+# Data Processing
+numpy>=1.21.0
+pandas>=1.3.0
+scikit-learn>=1.0.0
+
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+tensorboard>=2.8.0
+
+# Utilities
+tqdm>=4.62.0
+pyyaml>=6.0
+omegaconf>=2.1.0
+
+# Development
+pytest>=7.0.0
+black>=22.0.0
+flake8>=4.0.0
+isort>=5.10.0
+
+# Jupyter
+jupyter>=1.0.0
+ipywidgets>=7.6.0
+
+# Optional: Advanced features (uncomment as needed)
+# wandb>=0.12.0  # For experiment tracking
+# hydra-core>=1.1.0  # For configuration management
+# transformers>=4.15.0  # For transformer-based models
+# onnx>=1.10.0  # For model export
