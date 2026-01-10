@@ -1,0 +1,22 @@
+model: module.multireso.MultiResoModel
+ssl:
+  name: wav2vec2
+  ckpt: facebook/wav2vec2-large-robust
+  out_type: hidden_states-*
+  hidden_size: 1024
+  finetune_mode: default
+classifier:
+  include_utt: True
+  units: [0.02, 0.04, 0.08, 0.16]
+  n_frames: 400  # 4 second, more maybe
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0
+scheduler:
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: multireso
+    type: p2s
+    weight: 1.0

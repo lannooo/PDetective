@@ -1,0 +1,31 @@
+model: module.bam.BAM
+ssl:
+  name: wavlm
+  ckpt: microsoft/wavlm-large
+  out_type: hidden_state
+  hidden_size: 1024
+  pool_head: 1
+  finetune_mode: default
+classifier:
+  attn_head: 1
+  gap_layers: 2
+  resnet_channels: 32
+  hidden_size: 512
+  cut_gradient: True
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+scheduler:
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: frame
+    type: mask_ce
+    weight: 1.0
+  loss2:
+    name: boundary
+    type: balance
+    args:
+      negative_ratio: 5
+    weight: 0.5

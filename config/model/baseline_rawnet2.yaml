@@ -1,0 +1,21 @@
+model: module.rawnet.RawNet
+classifier:
+  first_conv: 1024   # no. of filter coefficients 
+  sinc_conv: fast    # sinc type: fast or normal
+  in_channels: 1
+  filts: [20, [20, 20], [20, 128], [128, 128]] # no. of filters channel in residual blocks
+  nb_fc_node: 1024
+  gru_node: 1024
+  nb_gru_layer: 3
+  nb_classes: 2
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+scheduler:
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: utterance
+    type: ce
+    weight: 1.0

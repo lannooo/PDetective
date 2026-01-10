@@ -1,0 +1,22 @@
+samplerate: 16000
+resolution: 0.02
+input_maxlength: ~
+input_minlength: 3200  # 0.2 second / 10 unit frames
+label_maxlength: 200
+segment_split_ratio: 1.8  # longer than label_maxlength * segment_split_ratio will be split
+
+
+datasets:
+  eval_set:
+    - name: llama-b
+      label_root: data/llamaps_eval_seglab_0.02.npy
+      data_root: data/LLamaPartialSpoof/R01TTS.0.b
+      dur_lst: data/llamaPS.b.lst
+      filters:
+        0: '*'
+        1: clean,cosyvoice,elevenlab,gptsovits,ljjets,xttsv2,yourtts
+        2: partial,full      # full (subset-A only) or partial (both), not used for genuine (clean)
+        3: cf,cp,oa          # cf (crossfade, subset-A only), cp / oa (cut-paste / over-add, subset-B only)
+      augment: False
+    
+augmentors: ~

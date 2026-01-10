@@ -1,0 +1,46 @@
+model: module.model.PartialDetector
+ssl:
+  name: wav2vec2
+  ckpt: facebook/wav2vec2-xls-r-300m
+  out_type: hidden_state
+  hidden_size: 1024
+  # [Fix]: freeze the wav2vec2 parameters; 
+  # [lora]: use LoRA to finetune Transformer blocks; 
+  # [default]: finetune Transformer blocks
+  finetune_mode: lora
+  lora_rank: 8
+  lora_alpha: 16
+  lora_target_modules: ["q_proj", "v_proj"]
+classifier:
+  # for [SVD compression], topk retains the top singular values (3, 5, or 10); 
+  # for [AE compression], defines the bottleneck size (64, 128, or 256)
+  topk: 3
+  # [svd]: only retain the most stable components; 
+  # [ae]: use autoencoder
+  # [none]: no compression; 
+  compression_mode: svd
+  proj_size: 4096
+  hidden_size: 512
+  n_layers: 3
+  pool: attention
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+scheduler:
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: frame
+    type: mask_ce
+    weight: 1.0
+  loss2:
+    name: boundary
+    type: balance
+    args:
+      negative_ratio: 5
+    weight: 0.1
+  loss3:
+    name: reg
+    type: direct
+    weight: 0.1

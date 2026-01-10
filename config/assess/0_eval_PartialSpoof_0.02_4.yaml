@@ -1,0 +1,20 @@
+samplerate: 16000
+resolution: 0.02
+input_maxlength: ~
+input_minlength: 3200  # 0.2 second / 10 unit frames
+label_maxlength: 200
+segment_split_ratio: 1.8  # longer than label_maxlength * segment_split_ratio will be split
+
+
+datasets:
+  eval_set:
+    - name: partialspoof
+      label_root: data/PartialSpoof/database/segment_labels/eval_seglab_0.02.npy
+      data_root: data/PartialSpoof/database/eval/con_wav
+      dur_lst: data/partialspoof_eval.lst
+      filters:
+        0: CON,LA  # LA: genuine, CON: partial spoofing
+        1: E       
+      augment: False
+ 
+augmentors: ~

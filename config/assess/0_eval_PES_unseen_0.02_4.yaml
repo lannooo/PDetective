@@ -1,0 +1,19 @@
+samplerate: 16000
+resolution: 0.02
+input_maxlength: ~
+input_minlength: 3200  # 0.2 second
+label_maxlength: 200
+segment_split_ratio: 1.8  # longer than label_maxlength * segment_split_ratio will be split
+
+
+datasets:
+  eval_set:
+    - name: PES-unseen
+      label_root: data/PES/annotations/eval_seglab_0.02.npy
+      data_root: data/PES/eval
+      dur_lst: data/PES_eval_duration.lst
+      filters:
+        0: CAP,EDI,FUL,REF
+        1: VCT,F5T,SAT2,VCX,NAN
+      augment: False
+augmentors: ~

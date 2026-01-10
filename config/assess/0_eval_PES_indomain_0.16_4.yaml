@@ -1,0 +1,43 @@
+samplerate: 16000
+resolution: 0.16
+input_maxlength: ~
+input_minlength: 3200  # 0.2 second
+label_maxlength: 25
+segment_split_ratio: 1.8  # longer than label_maxlength * segment_split_ratio will be split
+
+
+datasets:
+  eval_set:
+    - name: PES-eval-ful
+      label_root: data/PES/annotations/eval_seglab_0.02.npy
+      data_root: data/PES/eval
+      dur_lst: data/PES_eval_duration.lst
+      filters:
+        0: FUL,REF
+        1: FLT,SAT,SSR,NAN
+      augment: False
+    - name: PES-eval-cap
+      label_root: data/PES/annotations/eval_seglab_0.02.npy
+      data_root: data/PES/eval
+      dur_lst: data/PES_eval_duration.lst
+      filters:
+        0: CAP,REF
+        1: FLT,SAT,SSR,NAN
+      augment: False
+    - name: PES-eval-edi
+      label_root: data/PES/annotations/eval_seglab_0.02.npy
+      data_root: data/PES/eval
+      dur_lst: data/PES_eval_duration.lst
+      filters:
+        0: EDI,REF
+        1: FLT,SAT,SSR,NAN
+      augment: False
+    - name: PES-eval
+      label_root: data/PES/annotations/eval_seglab_0.02.npy
+      data_root: data/PES/eval
+      dur_lst: data/PES_eval_duration.lst
+      filters:
+        0: CAP,EDI,FUL,REF
+        1: FLT,SAT,SSR,NAN
+      augment: False
+augmentors: ~

@@ -1,0 +1,22 @@
+model: module.aasist.AASIST
+classifier:
+  first_conv: 128   # no. of filter coefficients 
+  sinc_type: fast    # sinc type: fast or normal
+  filts: [70, [1, 32], [32, 32], [32, 64], [64, 64]] # no. of filters channel in residual blocks
+  gat_dims: [64, 32]
+  pool_ratios: [0.5, 0.7, 0.5, 0.5]
+  temperatures: [2.0, 2.0, 100.0, 100.0]
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0.0001
+scheduler:
+  # type: cosine
+  # lr_min: 0.000005
+  # step_size: 3106
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: utterance
+    type: ce
+    weight: 1.0

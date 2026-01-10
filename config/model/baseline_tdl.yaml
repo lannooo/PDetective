@@ -1,0 +1,27 @@
+model: module.tdl.TDL
+ssl:
+  name: wav2vec2
+  ckpt: facebook/wav2vec2-xls-r-300m
+  out_type: hidden_state
+  hidden_size: 1024
+  finetune_mode: fix
+classifier:
+  emb_dim: 32
+  out_channel: 2
+  dynamic: True
+  nframes: 25   # 4 seconds
+optim:
+  learning_rate: 0.0001
+  weight_decay: 0.0001   # maybe smaller
+scheduler:
+  step_size: 10
+  gamma: 0.5
+objective:
+  loss1:
+    name: frame
+    type: mask_bce
+    weight: 1.0
+  loss2:
+    name: embedding
+    type: embedding
+    weight: 0.5
