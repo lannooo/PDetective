@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 # Loading HuggingFace Models Locally, uncomment them if loading from local
 import os
-os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
-os.environ['HF_DATASETS_OFFLINE'] = '1'
-os.environ['HF_HUB_OFFLINE'] = '1'
+# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+# os.environ['HF_DATASETS_OFFLINE'] = '1'
+# os.environ['HF_HUB_OFFLINE'] = '1'
 from transformers import Wav2Vec2Model, WavLMModel
 from peft import LoraConfig, get_peft_model
 
