@@ -8,21 +8,15 @@ ssl:
   # [lora]: use LoRA to finetune Transformer blocks; 
   # [default]: finetune Transformer blocks
   finetune_mode: lora
-  lora_rank: 8
-  lora_alpha: 16
+  lora_rank: 16
+  lora_alpha: 32
   lora_target_modules: ["q_proj", "v_proj"]
 classifier:
-  # for [SVD compression], topk retains the top singular values (3, 5, or 10); 
-  # for [AE compression], defines the bottleneck size (64, 128, or 256)
-  topk: 3
-  # [svd]: only retain the most stable components; 
-  # [ae]: use autoencoder
-  # [none]: no compression; 
-  compression_mode: svd
-  proj_size: 4096
+  proj_size: 512
   hidden_size: 512
   n_layers: 3
   pool: attention
+return_emb: h2 # h1: for SSL features directly, h2: for features before pooling, h3: for features after pooling
 optim:
   learning_rate: 0.0001
   weight_decay: 0.0001
@@ -41,6 +35,12 @@ objective:
       negative_ratio: 5
     weight: 0.1
   loss3:
-    name: reg
-    type: direct
-    weight: 0.1
+    name: tcl
+    type: tcl
+    args:
+      pos_margin: 0.8
+      neg_margin: 0.2
+      smooth_weight: 1.0
+      boundary_weight: 2.0
+    weight: 0.5
+  

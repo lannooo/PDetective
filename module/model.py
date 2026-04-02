@@ -28,6 +28,7 @@ class PartialDetector(nn.Module):
             lora_alpha=config.ssl.lora_alpha,
             lora_target_modules=config.ssl.lora_target_modules
         )
+        # print ssl_layer layers
         in_dim = self.ssl_layer.out_dim
         assert in_dim % 32 == 0, "The input dimension must be multiple of 32"
         self.classifier = DualHeadClassifier(
@@ -35,30 +36,41 @@ class PartialDetector(nn.Module):
             proj_dim=config.classifier.proj_size,
             hidden_dim=config.classifier.hidden_size,
             n_layers=config.classifier.n_layers,
-            topk=config.classifier.topk,
-            compression_mode=config.classifier.compression_mode,
             pool_frames=pool_frames,
             pool_type=config.classifier.pool
         )
+        print(self.embedding_type(), "embeddings will be returned for visualization.")
+    
+    def embedding_type(self):
+        if getattr(self.args, 'visualize_embedding', None) is not None:
+            return self.args.visualize_embedding
+        return getattr(self.config, 'return_emb', 'h3')
 
     def forward_x(self, batch):
         x = batch["sig"]
-        bdy_pred, frame_pred, reg_loss = self.forward(x)
+        bdy_pred, frame_pred, embeddings = self.forward(x)
         return {
             "utt_id": batch['utt_id'],
             "frame_pred": frame_pred,
             "frame_target": batch['frame_label'],
             "frame_length": batch['frame_length'],
+            "frame_emb": embeddings,
+            "emb_frame_target": batch['original_frame_label'] if self.embedding_type() != 'h3' else batch['frame_label'],
+            "emb_frame_length": batch['original_frame_length'] if self.embedding_type() != 'h3' else batch['frame_length'],
             "boundary_pred": bdy_pred,
             "boundary_target": batch['boundary_label'],
             "boundary_length": batch['boundary_length'],
-            "reg_loss": reg_loss
         }
 
     def forward(self, x):
-        x = self.ssl_layer(x)
-        cls_pred, bdr_pred, reg_loss = self.classifier(x)
-        return bdr_pred, cls_pred, reg_loss
+        h1 = self.ssl_layer(x)
+        cls_pred, bdr_pred, h2, h3 = self.classifier(h1)
+        if self.embedding_type() == 'h1':
+            return bdr_pred, cls_pred, h1
+        elif self.embedding_type() == 'h2':
+            return bdr_pred, cls_pred, h2
+        else:
+            return bdr_pred, cls_pred, h3
 
 
 class DualHeadClassifier(nn.Module):
@@ -68,14 +80,10 @@ class DualHeadClassifier(nn.Module):
                  hidden_dim, 
                  n_layers=2,
                  cls_num=2,
-                 topk=5,
-                 compression_mode='svd',
                  pool_frames=1,
                  pool_head=1,
                  pool_type='attention'):
         super(DualHeadClassifier, self).__init__()
-        self.topk = topk
-        self.compression_mode = compression_mode
         self.pool_frames = pool_frames
         self.pool_nhead = pool_head
         self.pool_type = pool_type
@@ -87,13 +95,6 @@ class DualHeadClassifier(nn.Module):
             nn.GELU(),
             nn.Linear(proj_dim, hidden_dim),
         )
-
-        if self.compression_mode == 'ae':
-            self.ae_encoder = AutoEncoder(input_dim, ae_dim=self.topk)
-            self.ae_fc = nn.Sequential(
-                nn.Linear(self.ae_encoder.ae_dim, hidden_dim),
-                nn.GELU()
-            )
 
         # Define Mamba backbone as classifier
         self.mamba_encoder = Mamba(MambaConfig(d_model=hidden_dim, n_layers=n_layers))
@@ -119,85 +120,25 @@ class DualHeadClassifier(nn.Module):
             nn.Sigmoid()
         )
 
-    def decompose(self, X, k=5):
-        """
-        X: (B, T, D)
-        """
-        B, T, D = X.shape
-        device = X.device
-        dtype = X.dtype
-        
-        mu = X.mean(dim=1, keepdim=True)     # (B, 1, D)
-        Xc = X - mu                           # (B, T, D)
-        Xc = torch.clamp(Xc, min=-1e12, max=1e12)
-
-        def perform_svd(matrix):
-            U, S, Vh = torch.linalg.svd(matrix.to(torch.float64), full_matrices=False)
-            return U.to(dtype), S.to(dtype), Vh.to(dtype)
-    
-        try:
-            U, S, Vh = perform_svd(Xc)
-        except RuntimeError as e:
-            # In case of SVD not converging, add small noise
-            print("Warning: SVD did not converge, adding small noise to input.", e)
-            try:
-                eps = 1e-6
-                noise = torch.eye(T, D, device=device).unsqueeze(0) * eps
-                U, S, Vh = perform_svd(Xc + noise)
-            except RuntimeError as e2:
-                print("Error: SVD failed twice. Using fallback.", e2)
-                X_low = X.detach() 
-                X_high = torch.zeros_like(X)
-                return X_low, X_high, (None, None, None)
-        
-        if torch.isnan(S).any():
-            print("Error! NaN encountered in SVD decomposition.")
-            return X.detach(), torch.zeros_like(X), (U, S, Vh)
-
-        U_k = U[:, :, :k]                     # (B, T, k)
-        S_k = torch.diag_embed(S[:, :k])      # (B, k, k)
-        Vh_k = Vh[:, :k, :]                   # (B, k, D)
-
-        X_low = U_k @ S_k @ Vh_k + mu         # (B, T, D)
-        X_high = X - X_low
-
-        return X_low, X_high, (U, S, Vh)
-
     def forward(self, x):
-        compression = self.compression_mode
-        reg_loss = torch.tensor(0.0, device=x.device)
-        if compression == 'svd':
-            try:
-                x_low, _, _ = self.decompose(x, k=self.topk)
-            except Exception as e:
-                print("[Error] SVD decomposition failed. Using original features.", e)
-                x_low = torch.zeros_like(x) # discard this data
-            x = x_low
-        elif compression == 'ae':
-            z, _, reg_loss_ae = self.ae_encoder(x.detach())
-            reg_loss += reg_loss_ae
-
         # Feed forward to expand the dimension and enhance representation
-        if compression == 'ae':
-            x = self.feed_forward(x) + self.ae_fc(z)
-        else:
-            x = self.feed_forward(x)
+        x = self.feed_forward(x)
 
         h = self.mamba_encoder(x)
-            
-        if self.pool_type == 'attention':
-            h = self.pooling(h)
-        elif self.pool_type.startswith('adaptive'):
-            h = self.pooling(h, output_length=h.size(1)//self.pool_frames)
-        else:
-            h = self.pooling(h, output_length=None)
         
-        frame_logits = self.frame_cls_head(h)  # (B, L, 2)
-        boundary_logits = self.boundary_head(h).squeeze(-1)   # (B, L)
-        return frame_logits, boundary_logits, reg_loss
+        if self.pooling is None:
+            hp = h
+        elif self.pool_type == 'attention':
+            hp = self.pooling(h)
+        elif self.pool_type.startswith('adaptive'):
+            hp = self.pooling(h, output_length=h.size(1)//self.pool_frames)
+        else:
+            hp = self.pooling(h, output_length=None)
+        
+        frame_logits = self.frame_cls_head(hp)  # (B, L, 2)
+        boundary_logits = self.boundary_head(hp).squeeze(-1)   # (B, L)
+        return frame_logits, boundary_logits, h, hp
 
-
-class AutoEncoder(nn.Module):
     
     def __init__(self, input_dim, ae_dim=128,
                  ae_alpha=[1.0, 1.0, 0.0001]):

@@ -36,6 +36,16 @@ def get_boundary_label(label):
     boundary_label[pos] = 1.0
     return boundary_label
 
+def load_eval_result(output_files: list[str]):
+    import pickle
+    
+    total_result = {}
+    for ofile in output_files:
+        with open(ofile, 'rb') as f:
+            result = pickle.load(f)
+        total_result.update(result)
+    return total_result
+
 
 def get_mask(label, length=None):
     mask = torch.ones_like(label)

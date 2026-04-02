@@ -46,6 +46,8 @@ class BAM(nn.Module):
             "frame_target": batch['frame_label'],
             "frame_length": batch['frame_length'],
             "frame_emb": embedding,
+            "emb_frame_target": batch['frame_label'],
+            "emb_frame_length": batch['frame_length'],
             "boundary_pred": bdy_pred,
             "boundary_target": batch['boundary_label'],
             "boundary_length": batch['boundary_length'],

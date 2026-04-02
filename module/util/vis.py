@@ -1,48 +1,71 @@
-import h5py
+import pickle
 import numpy as np
 import os
+import torch
 
-class EmbeddingCache:
-    def __init__(self, cache_path):
+def to_numpy(x):
+    if isinstance(x, np.ndarray):
+        return x
+    elif isinstance(x, torch.Tensor):
+        return x.cpu().numpy()
+    else:
+        raise TypeError("Input must be a PyTorch tensor or a NumPy array.")
+
+class EvalResultCache:
+    def __init__(self, cache_path, visualize=False):
         self.cache_path = cache_path
-        self.h5_file = h5py.File(self.cache_path, 'w')
+        self.visualize = visualize
+        self.cache_dict = {}
+        self.current_save_file = None
+        os.makedirs(self.cache_path, exist_ok=True)
         print(f"Embedding cache initialized at {self.cache_path}")
+
     
-    def write_batch(self, utt_ids, scores, embeddings, labels, lengths):
-        if len(utt_ids) != len(embeddings) or len(utt_ids) != len(labels) or len(utt_ids) != len(lengths):
+    def write_cache(self, utt_ids, scores, labels, lengths, embeddings, emb_labels, emb_lengths):
+        if len(utt_ids) != len(scores) or len(utt_ids) != len(labels) or len(utt_ids) != len(lengths):
             raise ValueError("Length of utt_ids, embeddings, labels, and lengths must match.")
-        for utt_id, score, embedding, label, length in zip(utt_ids, scores, embeddings, labels, lengths):
-            if utt_id in self.h5_file:
-                print(f"Warning: {utt_id} already exists in cache. Overwriting.")
-            group = self.h5_file.create_group(utt_id)
-            group.create_dataset('score', data=score[:length], compression='gzip')
-            group.create_dataset('embedding', data=embedding[:length], compression='gzip')
-            group.create_dataset('label', data=label[:length], compression='gzip')
-    
+
+        scores = to_numpy(scores)
+        labels = to_numpy(labels)
+        lengths = to_numpy(lengths)
+        embeddings = to_numpy(embeddings) if self.visualize else embeddings
+        emb_labels = to_numpy(emb_labels) if self.visualize else emb_labels
+        emb_lengths = to_numpy(emb_lengths) if self.visualize else emb_lengths
+        for i, utt_id in enumerate(utt_ids):
+            if self.visualize:
+                L = emb_lengths[i]
+                item = {
+                    'embedding': embeddings[i, :L, :],
+                    'label': emb_labels[i, :L],
+                }
+            else:
+                L = lengths[i]
+                item = {
+                    'score': scores[i, :L],
+                    'label': labels[i, :L]
+                }
+
+            self.cache_dict[utt_id] = item
+
+    def save_cache(self):
+        save_file = self.current_save_file
+        if save_file is None:
+            save_file = os.path.join(self.cache_path, 'eval_cache.pkl')
+        print(f"Packing and saving to .pkl file: {save_file}")
+        # save the cache_dict to a .pkl file
+        with open(save_file, 'wb') as f:
+            pickle.dump(self.cache_dict, f)
+
+        file_size = os.path.getsize(save_file) / (1024 * 1024)
+        print(f"Cache saved successfully. Size: {file_size:.2f} MB")
+        self.cache_dict.clear()
+
+    def set_cache_file(self, dataset_key, dataloader_idx):
+        if dataset_key is None:
+            self.current_save_file = os.path.join(self.cache_path, f'eval_cache_dataloader{dataloader_idx}.pkl')
+        else:
+            self.current_save_file = os.path.join(self.cache_path, f'eval_cache_{dataset_key}.pkl')
+        print(f"Set current cache file to: {self.current_save_file}")
+
     def close(self):
-        if self.h5_file:
-            file_size = os.path.getsize(self.cache_path) / (1024 * 1024)
-            print(f"Closing embedding cache. Size: {file_size:.2f} MB")
-            self.h5_file.close()
-            self.h5_file = None
-            print(f"Embedding cache closed at {self.cache_path}")
-
-
-def plot_diff_ori_recon(ori, recon, diff, uttids, seglabs, lengths):
-    import matplotlib.pyplot as plt
-    for src, tgt, dff, uttid, seglab, length in zip(ori, recon, diff, uttids, seglabs, lengths):
-        src, tgt, dff = src.cpu().numpy().T, tgt.cpu().numpy().T, dff.cpu().numpy().T
-        seglab = seglab.cpu().numpy()
-        length = length.cpu().item()
-        plt.figure(figsize=(6, 6))
-        plt.subplot(221)
-        plt.imshow(src[:, :length], aspect='auto')
-        plt.subplot(222)
-        plt.imshow(tgt[:, :length], aspect='auto')
-        plt.subplot(223)
-        plt.imshow(dff[:, :length], aspect='auto')
-        plt.subplot(224)
-        plt.plot(seglab[:length])
-        plt.xlim(0, length)
-        plt.savefig(f'temp/{uttid}.png')
-        plt.close()
+        self.save_cache()

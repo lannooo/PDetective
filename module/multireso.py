@@ -142,7 +142,7 @@ def aggregate_labels(
     scale: int                  # 1, 2, 4, 8
 ):
     """
-    将 0.02s 帧级标签聚合到更粗时间尺度
+    Aggregate frame-level labels to coarser resolution.
     """
     B, L = frm_labels.shape
     device = frm_labels.device

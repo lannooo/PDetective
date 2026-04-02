@@ -1,0 +1,8 @@
+[path]
+cache            = "./cache"
+exp              = "./exp"
+background_noise = "/path/to/background_noise"
+reverb_ir        = "/path/to/reverb_rir"
+
+[model]
+diffwave_ckpt    = "./diffwave-ljspeech-22kHz-1000578.pt"

@@ -14,11 +14,15 @@ class BasicMetric:
     
     def _calculate_precision_recall(self, prc:PrecisionRecallCurve):
         precision, recall, thresholds = prc.compute()
+        assert len(precision) == len(recall) == len(thresholds)+1, f"Precision ({precision.shape}), recall ({recall.shape}), and thresholds ({thresholds.shape}) must have the same length."
         # calcualte a best threshold
         f1 = 2 * (precision * recall) / (precision + recall)
         # there maybe are nan values, replace nan to zero
         f1[torch.isnan(f1)] = 0
+        # get the max one index
         idx = torch.argmax(f1)
+        print("Calculating metric index", idx)
+        # assert idx.size(0) == 1, f"Expected a single index, but got {idx}: {f1}"
         return precision[idx], recall[idx], thresholds[idx]
     
     def _calculate_auroc(self, auroc:AUROC):
@@ -82,7 +86,17 @@ class FrameMetric(BasicMetric):
             self.prc_dict[stage].update(preds, target)
             self.roc_dict[stage].update(preds, target)
             self.auroc_dict[stage].update(preds, target)
-
+    
+    def update_(self, stage, frame_preds: Tensor, frame_target: Tensor):
+        assert stage in ['train', 'validate', 'test'], f"Invalid stage: {stage}"
+        if frame_preds.dim() > 2:
+            frame_preds = frame_preds.flatten()
+        if frame_target.dim() > 2:
+            frame_target = frame_target.flatten()
+        self.prc_dict[stage].update(frame_preds, frame_target)
+        self.roc_dict[stage].update(frame_preds, frame_target)
+        self.auroc_dict[stage].update(frame_preds, frame_target)
+    
     def report(self, stage):
         assert stage in ['train', 'validate', 'test'], f"Invalid stage: {stage}"
         eer, thres1 = self._calcualte_eer(self.roc_dict[stage])

@@ -16,3 +16,5 @@ diffwave==0.1.7
 mambapy==1.2.0
 tqdm==4.66.2
 torchmetrics==1.6.1
+toml==0.10.2
+audiomentations==0.42.0

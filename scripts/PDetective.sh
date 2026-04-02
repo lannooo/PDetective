@@ -4,7 +4,7 @@
 # 1. basic configurations
 # ==========================================
 EXP_NAME="PDetective"
-CONFIG="config/model/baseline_PFD.yaml"
+CONFIG="config/model/PDetective.yaml"
 ASSESS_CONFIG="config/assess/1_PES_cap_aug_all_0.16_4.yaml"
 GPU_ID=0
 # increase num_workers carefully, may cause memory issue when enable data augmentation (DiffWave or WaveGlow)

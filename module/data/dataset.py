@@ -10,7 +10,7 @@ import lightning as L
 from tqdm import tqdm
 from torch.utils.data import Dataset, ConcatDataset, DataLoader
 from module.util.utils import find_files, get_boundary_label
-from module.aug.augment import GriffinLimAugmentor, WaveGlowAugmentor, DiffWaveAugmentor
+from module.aug.augment import GriffinLimAugmentor, WaveGlowAugmentor, DiffWaveAugmentor, WaveAugmentor
 
 class BaseDataset(Dataset):
     def __init__(
@@ -57,8 +57,9 @@ class BaseDataset(Dataset):
         self.sampling_config = sampling_config
         # data augmentation settings
         self.enable_augment = enable_augment
-        self.augment_pipelines = {} if not augment_args else {arg["name"]: arg for arg in augment_args}
-        self.augment_configs = [] if not augment_args else augment_args
+        self.augment_configs = {} if not augment_args else {arg["name"]: arg for arg in augment_args}
+        # the real augmentor dict built from the augment_configs, which will be applied selectively by random choice
+        self.augmentors = {}
 
         if isinstance(root, str):
             sample_list = sorted(find_files(root, query=self.input_query))
@@ -87,19 +88,23 @@ class BaseDataset(Dataset):
         assert self.label_resolution in [0.02, 0.04, 0.08, 0.16], f"label resolution {self.label_resolution} is not supported"
         self.scale = int(self.label_resolution // 0.02) # e.g., 0.02s -> 0.16s, scale = 8
 
+        # load frame-level labels
+        self.labels = self.label_load_fn()
+
         # filting audio samples
         self.sample_list = self.sample_filter(sample_list)
         # Utt_id: SPOOF_MODEL_SEQ
         self.utt_ids = [os.path.splitext(os.path.basename(f))[0] for f in self.sample_list]
-
-        # load frame-level labels
-        self.labels = self.label_load_fn()
 
         # split into pieces for evaluation if necessary
         if subset == 'eval' and pad_mode == 'label' and label_maxlength is not None:
             # original utterance are split into fix-length segments for evaluation
             # FLT_CAP_00001 -> FLT_CAP_00001#0,1600
             self.split_pieces()
+
+        self.domain_to_id = self.build_domain_map()
+        print(f"[{self.subset}] domain to id map: {self.domain_to_id}")
+        self.unknown_domain_id = len(self.domain_to_id)
 
         self.post_statistics()
     
@@ -122,17 +127,27 @@ class BaseDataset(Dataset):
         return new_sample_list
     
     def sample_filter(self, sample_list):
+        # filter out samples not in labels
+        old_n = len(sample_list)
+        sample_list = [f for f in sample_list if os.path.splitext(os.path.basename(f))[0] in self.labels]
+        new_n = len(sample_list)
+
+        if old_n != new_n:
+            print(f"[{self.subset}] Filter out samples not in label metadata: {old_n} => {new_n}")
+
+
         if self.filter_rules is not None:
             sample_list = self.filter_spoof_types(sample_list)
         else:
-            print(f"no filter applied for <{self.subset}> dataset")
+            print(f"[{self.subset}] No spoofing filter applied for <{self.subset}> dataset")
         # sampling random or fixed size of samples as the configuration
         if self.sampling_config is not None:
             mode = self.sampling_config.get('mode', 'random')
             ratio = self.sampling_config.get('ratio', 1.0)
+            old_n = len(sample_list)
             if mode == 'random':
                 random.seed(42)
-                return random.sample(sample_list, int(len(sample_list) * ratio))
+                sample_list = random.sample(sample_list, int(len(sample_list) * ratio))
             elif mode == 'fix':
                 random.seed(42)
                 random.shuffle(sample_list)  # keep everytime the same order
@@ -147,6 +162,8 @@ class BaseDataset(Dataset):
                         sample_list = sample_list[:int(len(sample_list) * ratio)]
             else:
                 raise ValueError(f"Unknown sampling mode: {mode}")
+            new_n = len(sample_list)
+            print(f"[{self.subset}] Filter by sampling config: {old_n} => {new_n}")
         return sample_list
     
 
@@ -267,6 +284,39 @@ class BaseDataset(Dataset):
     def get_rule_segs(self, samplename):
         raise NotImplementedError
 
+    def normalize_utt_name(self, samplename):
+        utt_name = os.path.splitext(os.path.basename(samplename))[0]
+        return utt_name.split('#', 1)[0]
+
+    def get_domain_key(self, utt_id):
+        utt_segs = self.get_rule_segs(utt_id)
+        if len(utt_segs) <= 1:
+            return self.name
+        return utt_segs[1]
+
+    def get_known_domain_keys(self):
+        if self.filter_rules:
+            domain_rule_idx = 1
+            if domain_rule_idx not in self.filter_rules:
+                return sorted({self.get_domain_key(utt_id) for utt_id in self.utt_ids})
+            rule_keys = [key.strip() for key in self.filter_rules[domain_rule_idx].split(',')]
+            rule_keys = [key for key in rule_keys if key and key != '*']
+            if rule_keys:
+                return sorted(set(rule_keys))
+        return sorted({self.get_domain_key(utt_id) for utt_id in self.utt_ids})
+
+    def build_domain_map(self):
+        domain_keys = self.get_known_domain_keys()
+        return {domain_key: idx for idx, domain_key in enumerate(domain_keys)}
+
+    def set_domain_map(self, domain_to_id):
+        self.domain_to_id = dict(domain_to_id)
+        print(f"[{self.subset}] set domain to id map: {self.domain_to_id}")
+        self.unknown_domain_id = len(self.domain_to_id)
+
+    def get_domain_id(self, utt_id):
+        return self.domain_to_id.get(self.get_domain_key(utt_id), self.unknown_domain_id)
+
     def __getitem__(self, index):
         utt_id = self.utt_ids[index] # SPOOF_MODEL_SEQ#start,end
         input = self.input_load_fn(self.sample_list[index], utt_id)
@@ -275,6 +325,8 @@ class BaseDataset(Dataset):
         # augment audio signals with RIR, noise, vocoder, etc. (configured in augment_pipelines)
         if self.enable_augment:
             input = self.augment(input, utt_id)
+            assert input is not None, f"Augmentation failed for {utt_id}, return None"
+            assert len(input) > 0, f"Augmentation resulted in empty signal for {utt_id}"
         
         # the original frame-level labels in 0.02s/frame resolution
         ori_frame_label = self.labels[utt_id]
@@ -315,35 +367,86 @@ class BaseDataset(Dataset):
 
         return {
             "utt_id": utt_id,
+            "domain_key": self.get_domain_key(utt_id),
+            "domain_id": self.get_domain_id(utt_id),
             "sig": input,
             "utt_label": utt_label,
             "frame_label": frame_label,
             "frame_length": frame_length,
             "boundary_label": boundary_label,
             "boundary_length": boundary_length,
+            "original_frame_label": ori_frame_label,
+            "original_frame_length": ori_frame_length
         }
     
     def __len__(self):
         return len(self.sample_list)
 
 
+def convert_config_to_augmentor_pipeline(configs, instance:BaseDataset):
+    augmentors = []
+    for cfg in configs:
+        name, p = cfg['name'], cfg['p'] # inner probability check for each augmentor in the pipeline
+        if p <= 0:
+            continue
+        if name == 'griffin_lim':
+            freq_distort_scale = cfg.get('freq_scale', 0.0)
+            augmentors.append((GriffinLimAugmentor(n_fft=320, hop_length=160, freq_distortion=freq_distort_scale), p))
+        elif name == 'waveglow':
+            cache_key = cfg.get("cache_key", None)
+            cache_key = None if cache_key is None else f"{instance.name}/{instance.subset}/{cache_key}"
+            augmentors.append((WaveGlowAugmentor(device=instance.device, cache_key=cache_key), p))
+        elif name == 'diffwave':
+            cache_key = cfg.get("cache_key", None)
+            cache_key = None if cache_key is None else f"{instance.name}/{instance.subset}/{cache_key}"
+            augmentors.append((DiffWaveAugmentor(device=instance.device, cache_key=cache_key), p))
+        elif name == 'gaussian_noise':
+            extra_args = cfg.get("snr", None)
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='gaussian', extra_args=extra_args), p))
+        elif name == 'background_noise':
+            extra_args = cfg.get("snr", None)
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='background', extra_args=extra_args), p))
+        elif name == 'reverb':
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='reverb'), p))
+        elif name == 'mp3comp':
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='mp3'), p))
+        elif name == 'pitch':
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='pitch'), p))
+        elif name == 'filter':
+            extra_args = [cfg.get("filter_type", None), cfg.get("cutoff", None)]
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='filter', extra_args=extra_args), p))
+        elif name == 'clip':
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='clip'), p))
+        elif name == 'time_mask':
+            augmentors.append((WaveAugmentor(device=instance.device, transform_type='time_mask'), p))
+        else:
+            raise ValueError(f"Unknown augmentor name: {name}")
+    return augmentors
+
 class PartialSpoofDataset(BaseDataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.has_pipeline("griffin_lim") or self.has_pipeline("gaussian_noise"):
-            freq_distort_scale = self.augment_pipelines["griffin_lim"]['freq_scale'] if self.has_pipeline("griffin_lim") else None
-            self.vocmentor = GriffinLimAugmentor(n_fft=320, hop_length=160, freq_distortion=freq_distort_scale)
-        if self.has_pipeline("waveglow"):
-            cache_key = self.augment_pipelines["waveglow"].get("cache_key", None)
-            cache_key = None if cache_key is None else f"{self.name}/{self.subset}/{cache_key}"
-            self.glomentor = WaveGlowAugmentor(device=self.device, cache_key=cache_key)
-        if self.has_pipeline("diffwave"):
-            cache_key = self.augment_pipelines["diffwave"].get("cache_key", None)
-            cache_key = None if cache_key is None else f"{self.name}/{self.subset}/{cache_key}"
-            self.difmentor = DiffWaveAugmentor(device=self.device, cache_key=cache_key)
-        self.augment_choices = []
-        for key, augc in self.augment_pipelines.items():
-            self.augment_choices.append((key, augc['p']))
+        self.augment_choices = []  # [(name, p), ...] for random selection
+        for cfg_name, cfgs in self.augment_configs.items():
+            # outter probability check for the whole pipeline
+            if cfgs['p'] <= 0: continue
+
+            if cfg_name.startswith("pipeline-"):
+                # A augment pipeline is a combination of multiple augmentors, e.g., "pipeline-1": {"p": 0.5, "augs": ["gaussian_noise", "reverb"]},
+                # which means randomly apply gaussian noise and reverb sequentially with 0.5 probability
+                aug_configs, aug_p = cfgs['augs'], cfgs['p']
+                pipe_augmentors = convert_config_to_augmentor_pipeline(aug_configs, self)
+                if len(pipe_augmentors) > 0:
+                    self.augmentors[cfg_name] = pipe_augmentors
+                    self.augment_choices.append((cfg_name, aug_p))
+            else:  
+                # a single augmentor, e.g., "gaussian_noise": {"p": 0.5, "snr": [20, 30]}
+                temp_augmentor = convert_config_to_augmentor_pipeline([cfgs], self)  # convert single augmentor config to pipeline format
+                if len(temp_augmentor) > 0:
+                    aug_ins, aug_p = temp_augmentor[0]
+                    self.augmentors[cfg_name] = aug_ins
+                    self.augment_choices.append((cfg_name, aug_p))
+        # No augment choice
         if len(self.augment_choices) > 0:
             sum_p = sum([t[1] for t in self.augment_choices])
             if sum_p < 1.0:
@@ -361,48 +464,37 @@ class PartialSpoofDataset(BaseDataset):
         print(f"[{self.subset}] Total: {len(self.utt_ids)}, "
               f"spoofing types: {sp_set}, models: {md_set}")
         if self.enable_augment:
-            print(f"[{self.subset}] Augmentation pipelines: {self.augment_pipelines}")
+            print(f"[{self.subset}] Augmentation pipelines: {self.augment_configs}")
         else:
             print(f"[{self.subset}] No augmentation applied.")
     
     def get_rule_segs(self, samplename):
         # for partial spoof dataset, utt_id is like <SpoofingType>_<Model_Type>_<Seq>
-        utt_id = os.path.splitext(os.path.basename(samplename))[0]
+        utt_id = self.normalize_utt_name(samplename)
         utt_segs = utt_id.split('_')[:2]   # only consider the first two segments
         return utt_segs
-    
-    def has_pipeline(self, key:str):
-        """Check if the augmentation pipeline exists."""
-        if not self.enable_augment: 
-            return False
-        return key in self.augment_pipelines and self.augment_pipelines[key]['p'] > 0
-    
-    def random_apply(self, key:str):
-        """Randomly apply the augmentation pipeline based on its probability."""
-        if key not in self.augment_pipelines:
-            return False
-        p = self.augment_pipelines[key]['p']
-        return random.random() < p
         
     def augment(self, sig, utt_id):
-        if not self.augment_pipelines:  # None or empty list
+        if not self.augment_choices:  # None or empty list
             return sig
         # random select a augment option from self.augment_choices given their probabilities
         keys, weights = zip(*self.augment_choices)
         selected_option = random.choices(keys, weights=weights, k=1)[0]
-        # print(f"[Augment] random selected {selected_option}")
+
         if selected_option is None:
             return sig
-        elif selected_option == 'griffin_lim':
-            return self.vocmentor.griffin_lim(sig)
-        elif selected_option == 'gaussian_noise':
-            snr_range = self.augment_pipelines[selected_option].get("snr", [25, 30])  # default SNR is 25~30 dB
-            snr = random.randint(snr_range[0], snr_range[1])
-            return self.vocmentor.gaussian_noise(sig, snr=snr)
-        elif selected_option == 'waveglow':
-            return self.glomentor.transform(sig, utt_id)
-        elif selected_option == 'diffwave':
-            return self.difmentor.transform(sig, utt_id)
+        elif selected_option in self.augmentors:
+            augmentor = self.augmentors[selected_option]
+            if isinstance(augmentor, list):  # a pipeline of augmentors
+                for i, (aug_ins, aug_p) in enumerate(augmentor):
+                    if random.random() < aug_p:  # check probability for each augmentor in the pipeline
+                        # print(f"[Augment] applying {selected_option} - step {i+1}/{len(augmentor)}: {type(aug_ins).__name__} with p={aug_p}")
+                        sig = aug_ins.transform(sig, utt_id)
+                return sig
+            else: # a single augmentor
+                # print(f"[Augment] applying {selected_option}: {type(augmentor).__name__} with p={dict(self.augment_choices)[selected_option]}")
+                return augmentor.transform(sig, utt_id)
+            
         else:
             raise ValueError(f"Unknown augmentation key: {selected_option}")
 
@@ -414,7 +506,7 @@ class LLamaPartialSpoofDataset(PartialSpoofDataset):
     def get_rule_segs(self, samplename):
         # for LLama-partialspoof dataset, utt_id is like:
         # <prefix>-<model/clean>[-<full/partial>][-<oa/cf/cp>]_<sequence>
-        utt_id = os.path.splitext(os.path.basename(samplename))[0]
+        utt_id = self.normalize_utt_name(samplename)
         utt_segs = utt_id.split('_', 1)[0].split('-')
         return utt_segs
     
@@ -428,7 +520,7 @@ class LLamaPartialSpoofDataset(PartialSpoofDataset):
         print(f"[{self.subset}] Total: {len(self.utt_ids)}, "
               f"spoofing types: {sp_set}, models: {md_set}, overlap: {ov_set}")
         if self.enable_augment:
-            print(f"[{self.subset}] Augmentation pipelines: {self.augment_pipelines}")
+            print(f"[{self.subset}] Augmentation pipelines: {self.augment_configs}")
         else:
             print(f"[{self.subset}] No augmentation applied.")
 
@@ -436,13 +528,40 @@ class DataModule(L.LightningDataModule):
     def __init__(self, cfg):
         super().__init__()
         self.cfg = cfg
+        self.shared_domain_to_id = None
+
+    def _collect_domain_map(self, datasets):
+        domain_keys = sorted({
+            domain_key
+            for dataset in datasets
+            for domain_key in dataset.get_known_domain_keys()
+        })
+        return {domain_key: idx for idx, domain_key in enumerate(domain_keys)}
+
+    def _apply_domain_map(self, datasets, domain_to_id):
+        for dataset in datasets:
+            dataset.set_domain_map(domain_to_id)
 
     def setup(self, stage):
         if stage == 'fit' or stage is None:
             self.train_dataset = self.get_dataset('train')
+            self.shared_domain_to_id = self._collect_domain_map(self.train_dataset)
+            self._apply_domain_map(self.train_dataset, self.shared_domain_to_id)
             self.validate_dataset = self.get_dataset('dev')
+            self._apply_domain_map(self.validate_dataset, self.shared_domain_to_id)
         if stage == 'test' or stage is None:
-            self.test_dataset = self.get_dataset('eval')
+            if self.shared_domain_to_id is None and hasattr(self.cfg.datasets, "train_set"):
+                train_datasets = self.get_dataset('train')
+                self.shared_domain_to_id = self._collect_domain_map(train_datasets)
+                self.test_dataset = self.get_dataset('eval')
+                self._apply_domain_map(self.test_dataset, self.shared_domain_to_id)
+            elif self.shared_domain_to_id is not None:
+                self.test_dataset = self.get_dataset('eval')
+                self._apply_domain_map(self.test_dataset, self.shared_domain_to_id)
+            else:
+                self.test_dataset = self.get_dataset('eval')
+                self.shared_domain_to_id = self._collect_domain_map(self.test_dataset)
+                self._apply_domain_map(self.test_dataset, self.shared_domain_to_id)
 
     def train_dataloader(self):
         dataset = self.train_dataset[0] if len(self.train_dataset) == 1 else ConcatDataset(self.train_dataset)

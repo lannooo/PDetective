@@ -1,5 +1,6 @@
 import numpy as np
 import math
+from sklearn.model_selection import train_test_split
 
 
 def convert_to_frame_labels(utt_id, duration, utt_label, segment_labels) -> np.ndarray:
@@ -58,5 +59,5 @@ frame_labels_b = read_label_file(label_file_b)
 frame_labels_a.update(frame_labels_b)
 
 # save into one npy file
-target_label_file = "./data/llamaps_eval_seglab_0.02.npy"
+target_label_file = "data/LLamaPartialSpoof/llamaps_eval_seglab_0.02.npy"
 np.save(target_label_file, frame_labels_a)

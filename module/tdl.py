@@ -158,7 +158,9 @@ class TDL(nn.Module):
             "frame_pred": frame_pred,
             "frame_target": batch['frame_label'],
             "frame_length": batch['frame_length'],
-            "embedding": embedding
+            "frame_emb": embedding,
+            "emb_frame_target": None,
+            "emb_frame_length": None
         }
 
 if __name__ == "__main__":

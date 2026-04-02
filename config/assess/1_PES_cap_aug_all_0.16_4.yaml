@@ -24,29 +24,41 @@ datasets:
         0: CAP,REF
         1: FLT,SAT,SSR,NAN
       augment: False
+      sampling:
+        mode: random
+        ratio: 0.5   # less to speed up dev
   eval_set:
-    - name: PES-eval-ful
+    ## uncomment to evaluate on separate subsets (CAP/EDI/FUL) --- IGNORE ---
+    # - name: PES-eval-ful
+    #   label_root: data/PES/annotations/eval_seglab_0.02.npy
+    #   data_root: data/PES/eval
+    #   dur_lst: data/PES_eval_duration.lst
+    #   filters:
+    #     0: FUL,REF
+    #     1: FLT,SAT,SSR,NAN
+    #   augment: False
+    # - name: PES-eval-cap
+    #   label_root: data/PES/annotations/eval_seglab_0.02.npy
+    #   data_root: data/PES/eval
+    #   dur_lst: data/PES_eval_duration.lst
+    #   filters:
+    #     0: CAP,REF
+    #     1: FLT,SAT,SSR,NAN
+    #   augment: False
+    # - name: PES-eval-edi
+    #   label_root: data/PES/annotations/eval_seglab_0.02.npy
+    #   data_root: data/PES/eval
+    #   dur_lst: data/PES_eval_duration.lst
+    #   filters:
+    #     0: EDI,REF
+    #     1: FLT,SAT,SSR,NAN
+    #   augment: False
+    - name: PES-eval
       label_root: data/PES/annotations/eval_seglab_0.02.npy
       data_root: data/PES/eval
       dur_lst: data/PES_eval_duration.lst
       filters:
-        0: FUL,REF
-        1: FLT,SAT,SSR,NAN
-      augment: False
-    - name: PES-eval-cap
-      label_root: data/PES/annotations/eval_seglab_0.02.npy
-      data_root: data/PES/eval
-      dur_lst: data/PES_eval_duration.lst
-      filters:
-        0: CAP,REF
-        1: FLT,SAT,SSR,NAN
-      augment: False
-    - name: PES-eval-edi
-      label_root: data/PES/annotations/eval_seglab_0.02.npy
-      data_root: data/PES/eval
-      dur_lst: data/PES_eval_duration.lst
-      filters:
-        0: EDI,REF
+        0: CAP,EDI,FUL,REF
         1: FLT,SAT,SSR,NAN
       augment: False
    

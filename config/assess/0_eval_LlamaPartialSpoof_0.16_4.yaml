@@ -9,7 +9,7 @@ segment_split_ratio: 1.8  # longer than label_maxlength * segment_split_ratio wi
 datasets:
   eval_set:
     - name: llama-b
-      label_root: data/llamaps_eval_seglab_0.02.npy
+      label_root: data/LLamaPartialSpoof/llamaps_eval_seglab_0.02.npy
       data_root: data/LLamaPartialSpoof/R01TTS.0.b
       dur_lst: data/llamaPS.b.lst
       filters:

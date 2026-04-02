@@ -107,8 +107,8 @@ class Transformer_Frontend(Frontend):
         # - default: fix feature extractor layer, while transformer layers can be finetuned
         # - all: all parameters are trainable
         sft_mode = kwargs.get("finetune_mode", "default")
-        sft_rank = kwargs.get("lora_rank", 8)
-        sft_alpha = kwargs.get("lora_alpha", 16)
+        sft_rank = kwargs.get("lora_rank", 16)
+        sft_alpha = kwargs.get("lora_alpha", 32)
         sft_target_modules = kwargs.get("lora_target_modules", ["q_proj", "v_proj"])
         if sft_mode == "fix":
             freeze_automatically(self.extractor, force_freeze_all=True)
@@ -154,3 +154,10 @@ class Transformer_Frontend(Frontend):
                 return outputs
         else:
             raise ValueError(f"Unknown output_type: {self.output_type}")
+
+
+if __name__ == "__main__":
+    # test the frontend module
+    ssl_ckpt = "facebook/wav2vec2-xls-r-300m"
+    model = Wav2Vec2Model.from_pretrained(ssl_ckpt)
+    print(model)
