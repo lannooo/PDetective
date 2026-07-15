@@ -1,8 +1,13 @@
 # 🕵️‍♂️ PDetective
 
+## 📰 News
+
+- **July 2026**: 🎉 Our paper on **PDetective** has been accepted by **ACM Multimedia (ACM MM) 2026**!  
+  We are excited to share our work on partial deepfake speech detection with the community.
+
 ## 🔍 Overview
 
-**PDetective** is a novel framework designed for **partial deepfake speech detection**, supporting fine-grained detection and excellent generalization across diverse forgery paradigms and unseen synthesis models.
+**PDetective** is a novel framework designed for **partial deepfake speech detection**, supporting fine-grained detection and excellent generalization across diverse forgery paradigms and unseen sy[...]
 
 ## 🚀 Quick Start
 
@@ -76,7 +81,7 @@ data/
   └── ...
 ```
 
-**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/`.
+**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/[...]
 Simply update the `data_root` field in the corresponding config file so that it points to the actual location of your dataset. Example:
 
 ```
@@ -133,12 +138,12 @@ YAML files in `config/assess/` define the data loading hyperparameters and the d
 
 - `1_PES_cap_base_xxx.yaml`: Baseline training without data augmentation.
 - `1_PES_cap_aug_xxx.yaml`: PES training with various augmentation strategies enabled.
-- `0_eval_PES_xxx.yaml`: Defines multiple evaluation subsets, including subsets for each forgery type (PES-eval-Ful, PES-eval-CaP, PES-eval-Edi), the full PES-eval set, and the unseen condition with previously unseen synthesis models (PES-unseen).
+- `0_eval_PES_xxx.yaml`: Defines multiple evaluation subsets, including subsets for each forgery type (PES-eval-Ful, PES-eval-CaP, PES-eval-Edi), the full PES-eval set, and the unseen condition w[...]
 - `0_eval_xxx_xxx.yaml`: Defines other public datasets.
 
 ## 🔁 Reproducibility
 
-Experiments are conducted with fixed random seeds specified in the configuration files. Minor numerical differences may occur due to differences in hardware, CUDA versions, or library implementations.
+Experiments are conducted with fixed random seeds specified in the configuration files. Minor numerical differences may occur due to differences in hardware, CUDA versions, or library implementat[...]
 
 ## 📜 License & Usage
 
