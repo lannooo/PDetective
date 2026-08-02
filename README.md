@@ -1,8 +1,13 @@
 # 🕵️‍♂️ PDetective
 
+This is the official implementation for our ACM MM'26 paper "**PDetective: Beyond Shallow Artifacts in Partial Deepfake Speech Detection**"
+
+**Abstract**: With the rapid advancement of fine-grained speech synthesis, partial deepfake speech has emerged as an increasingly concerning threat.
+Recent end-to-end speech editing systems further exacerbate this challenge by enabling acoustically and perceptually seamless partial forgeries, leading to the systematic failure of existing partial deepfake detectors. Our investigation of existing partial deepfake detection models reveals that these models exhibit a critical learning bias toward model-specific shallow decoding artifacts, which fundamentally undermines their generalization. To address this issue, we propose PDetective, a framework that mitigates artifact-dependent decision-making through targeted training constraints, encouraging the model to learn more intrinsic and stable representations. We further introduce a large-scale partial editing spoofing dataset comprising more than 250k utterances to underpin and validate our framework. Experiments demonstrate that PDetective significantly improves cross-domain generalization, reducing EER by over 11\% on unseen editing-based forgeries, and achieving an average EER reduction of over 30\% relative to the best-performing baselines in cross-dataset evaluations.
+
 ## 📰 News
 
-- **July 2026**: 🎉 Our paper on **PDetective** has been accepted by **ACM Multimedia (ACM MM) 2026**!  
+- **July 2026**: 🎉 Our paper on **PDetective** has been accepted by **ACM Multimedia (ACM MM) 2026**!
   We are excited to share our work on partial deepfake speech detection with the community.
 
 ## 🔍 Overview
@@ -81,8 +86,7 @@ data/
   └── ...
 ```
 
-**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/[...]
-Simply update the `data_root` field in the corresponding config file so that it points to the actual location of your dataset. Example:
+**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/[...] Simply update the `data_root` field in the corresponding config file so that it points to the actual location of your dataset. Example:
 
 ```
 datasets:
