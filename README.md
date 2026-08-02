@@ -12,7 +12,7 @@ Recent end-to-end speech editing systems further exacerbate this challenge by en
 
 ## 🔍 Overview
 
-**PDetective** is a novel framework designed for **partial deepfake speech detection**, supporting fine-grained detection and excellent generalization across diverse forgery paradigms and unseen sy[...]
+**PDetective** is a novel framework designed for **partial deepfake speech detection**, supporting fine-grained detection and excellent generalization across diverse forgery paradigms and unseen synthesis models.
 
 ## 🚀 Quick Start
 
@@ -86,7 +86,7 @@ data/
   └── ...
 ```
 
-**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/[...] Simply update the `data_root` field in the corresponding config file so that it points to the actual location of your dataset. Example:
+**Note**: If your local dataset is not organized following the directory structure shown above, you can still run all experiments by modifying the dataset configuration files under `config/assess/[...]`. Simply update the `data_root` field in the corresponding config file so that it points to the actual location of your dataset. Example:
 
 ```
 datasets:
@@ -142,16 +142,16 @@ YAML files in `config/assess/` define the data loading hyperparameters and the d
 
 - `1_PES_cap_base_xxx.yaml`: Baseline training without data augmentation.
 - `1_PES_cap_aug_xxx.yaml`: PES training with various augmentation strategies enabled.
-- `0_eval_PES_xxx.yaml`: Defines multiple evaluation subsets, including subsets for each forgery type (PES-eval-Ful, PES-eval-CaP, PES-eval-Edi), the full PES-eval set, and the unseen condition w[...]
+- `0_eval_PES_xxx.yaml`: Defines multiple evaluation subsets, including subsets for each forgery type (PES-eval-Ful, PES-eval-CaP, PES-eval-Edi), the full PES-eval set, and the unseen condition with previously unseen synthesis models (PES-unseen).
 - `0_eval_xxx_xxx.yaml`: Defines other public datasets.
 
 ## 🔁 Reproducibility
 
-Experiments are conducted with fixed random seeds specified in the configuration files. Minor numerical differences may occur due to differences in hardware, CUDA versions, or library implementat[...]
+Experiments are conducted with fixed random seeds specified in the configuration files. Minor numerical differences may occur due to differences in hardware, CUDA versions, or library implementations.
 
 ## 📜 License & Usage
 
-The PES dataset is released under the CC BY-NC 4.0 license and is intended for academic research only.
+This implementation is under MIT license. The PES dataset is released under the CC BY-NC 4.0 license and is intended for academic research only.
 
 ## 🔗 Referenced Repositories
 
